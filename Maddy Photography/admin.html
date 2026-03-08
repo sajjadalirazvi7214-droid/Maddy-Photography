@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Admin — Video Management</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <div class="admin-container">
+        <a href="index.html" class="admin-back-link">← Back to Studio</a>
+
+        <div class="admin-header">
+            <h1>Video Management</h1>
+            <p>Add or remove Instagram Reels displayed on the studio website.</p>
+        </div>
+
+        <!-- Add Video Form -->
+        <form class="admin-form" id="admin-form">
+            <div class="form-group">
+                <label for="video-title">Video Title</label>
+                <input type="text" id="video-title" placeholder="e.g. Wedding Highlights — Priya & Rahul" required>
+            </div>
+            <div class="form-group">
+                <label for="video-url">Instagram Reel Link</label>
+                <input type="url" id="video-url" placeholder="https://www.instagram.com/reel/XXXXXXXXX/" required>
+            </div>
+            <button type="submit" class="admin-submit">Add Video</button>
+        </form>
+
+        <!-- Existing Videos -->
+        <h2 class="admin-list-header">Existing Videos</h2>
+        <div class="admin-list" id="admin-list">
+            <!-- Rendered by JS -->
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const STORAGE_KEY = 'studioVideos';
+        const form = document.getElementById('admin-form');
+        const listEl = document.getElementById('admin-list');
+        const toastEl = document.getElementById('toast');
+
+        function getVideos() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+            catch { return []; }
+        }
+
+        function saveVideos(videos) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(videos));
+        }
+
+        function normalizeUrl(url) {
+            let embedUrl = url.trim();
+            if (embedUrl.includes('instagram.com/reel/') || embedUrl.includes('instagram.com/p/')) {
+                const match = embedUrl.match(/instagram\.com\/(reel|p)\/([^/?]+)/);
+                if (match) embedUrl = `https://www.instagram.com/reel/${match[2]}/embed`;
+            }
+            if (!embedUrl.endsWith('/embed') && !embedUrl.endsWith('/embed/')) {
+                embedUrl = embedUrl.replace(/\/$/, '') + '/embed';
+            }
+            return embedUrl;
+        }
+
+        function showToast(msg) {
+            toastEl.textContent = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2500);
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function renderList() {
+            const videos = getVideos();
+            if (videos.length === 0) {
+                listEl.innerHTML = '<div class="admin-empty">No videos added yet.</div>';
+                return;
+            }
+            listEl.innerHTML = videos.map(v => `
+        <div class="admin-video-item" data-id="${v.id}">
+          <div class="admin-video-info">
+            <h3>${escapeHtml(v.title)}</h3>
+            <p>${escapeHtml(v.url)}</p>
+          </div>
+          <button class="admin-delete-btn" onclick="deleteVideo('${v.id}')">Delete</button>
+        </div>
+      `).join('');
+        }
+
+        function deleteVideo(id) {
+            if (!confirm('Delete this video?')) return;
+            const videos = getVideos().filter(v => v.id !== id);
+            saveVideos(videos);
+            renderList();
+            showToast('Video deleted');
+        }
+
+        // Make deleteVideo accessible globally
+        window.deleteVideo = deleteVideo;
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('video-title').value.trim();
+            const url = document.getElementById('video-url').value.trim();
+
+            if (!title || !url) return;
+
+            const videos = getVideos();
+            const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+            videos.unshift({
+                id,
+                title,
+                url: normalizeUrl(url),
+                addedAt: new Date().toISOString()
+            });
+            saveVideos(videos);
+
+            form.reset();
+            renderList();
+            showToast('Video added successfully!');
+        });
+
+        // Initial render
+        renderList();
+    </script>
+</body>
+
+</html>
